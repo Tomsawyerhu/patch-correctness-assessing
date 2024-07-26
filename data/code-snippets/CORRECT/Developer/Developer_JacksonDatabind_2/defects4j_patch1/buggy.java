@@ -1,0 +1,10 @@
+public class test {
+    public void writeObject(Object value) throws IOException
+    {
+            _append(JsonToken.VALUE_EMBEDDED_OBJECT, value);
+            /* 28-May-2014, tatu: Tricky choice here; if no codec, should we
+             *   err out, or just embed? For now, do latter.
+             */
+//          throw new JsonMappingException("No ObjectCodec configured for TokenBuffer, writeObject() called");
+    }
+}

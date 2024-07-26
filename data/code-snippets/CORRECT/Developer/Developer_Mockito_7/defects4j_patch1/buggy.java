@@ -1,0 +1,8 @@
+public class test {
+        private void readTypeVariables() {
+            for (Type type : typeVariable.getBounds()) {
+                registerTypeVariablesOn(type);
+            }
+            registerTypeVariablesOn(getActualTypeArgumentFor(typeVariable));
+        }
+}

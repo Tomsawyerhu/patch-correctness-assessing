@@ -1,0 +1,36 @@
+public class test {
+    public synchronized NamespaceResolver getNamespaceResolver() {
+        if (localNamespaceResolver == null) {
+            localNamespaceResolver = new NamespaceResolver(super.getNamespaceResolver());
+            localNamespaceResolver.setNamespaceContextPointer(this);
+        }
+        return localNamespaceResolver;
+    }
+    public NodePointer createAttribute(JXPathContext context, QName name) {
+        if (!(node instanceof Element)) {
+            return super.createAttribute(context, name);
+        }
+        Element element = (Element) node;
+        String prefix = name.getPrefix();
+        if (prefix != null) {
+            String ns = null;
+            NamespaceResolver nsr = getNamespaceResolver();
+            if (nsr != null) {
+                ns = nsr.getNamespaceURI(prefix);
+            }
+            if (ns == null) {
+                throw new JXPathException(
+                    "Unknown namespace prefix: " + prefix);
+            }
+            element.setAttributeNS(ns, name.toString(), "");
+        }
+        else {
+            if (!element.hasAttribute(name.getName())) {
+                element.setAttribute(name.getName(), "");
+            }
+        }
+        NodeIterator it = attributeIterator(name);
+        it.setPosition(1);
+        return it.getNodePointer();
+    }
+}

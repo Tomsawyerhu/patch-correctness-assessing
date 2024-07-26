@@ -1,0 +1,14 @@
+public class test {
+    public void setEntry(int index, double value) {
+        checkIndex(index);
+        if (!isDefaultValue(value)) {
+            entries.put(index, value);
+        } else {
+            if (this.DEFAULT_ZERO_TOLERANCE == this.epsilon) {
+                if (entries.containsKey(index)) {
+                    entries.remove(index);
+                }
+            }
+        }
+    }
+}

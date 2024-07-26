@@ -1,0 +1,12 @@
+public class test {
+    public ObjectIdInfo findObjectReferenceInfo(Annotated ann, ObjectIdInfo objectIdInfo) {
+        JsonIdentityReference ref = _findAnnotation(ann, JsonIdentityReference.class);
+        if (ref == null) {
+            return objectIdInfo;
+        }
+        if (objectIdInfo == null) {
+            objectIdInfo = ObjectIdInfo.empty();
+        }
+        return objectIdInfo.withAlwaysAsId(ref.alwaysAsId());
+    }
+}

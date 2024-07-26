@@ -1,0 +1,29 @@
+public class test {
+    private boolean testAttr(Attr attr) {
+        String nodePrefix = DOMNodePointer.getPrefix(attr);
+        String nodeLocalName = DOMNodePointer.getLocalName(attr);
+
+        if (nodePrefix != null && nodePrefix.equals("xmlns")) {
+            return false;
+        }
+
+        if (nodePrefix == null && nodeLocalName.equals("xmlns")) {
+            return false;
+        }
+
+        String testLocalName = name.getName();
+        if (testLocalName.equals("*") || testLocalName.equals(nodeLocalName)) {
+            String testPrefix = name.getPrefix();
+
+            if (testPrefix == null || equalStrings(testPrefix, nodePrefix)) {
+                return true;
+            }
+            if (nodePrefix == null) {
+                return false;
+            }
+            return equalStrings(parent.getNamespaceURI(testPrefix), parent
+                    .getNamespaceURI(nodePrefix));
+        }
+        return false;
+    }
+}

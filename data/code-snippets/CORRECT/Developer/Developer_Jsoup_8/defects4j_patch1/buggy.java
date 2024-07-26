@@ -1,0 +1,5 @@
+public class test {
+    protected void outerHtml(StringBuilder accum) {
+        new NodeTraversor(new OuterHtmlVisitor(accum, ownerDocument().outputSettings())).traverse(this);
+    }
+}

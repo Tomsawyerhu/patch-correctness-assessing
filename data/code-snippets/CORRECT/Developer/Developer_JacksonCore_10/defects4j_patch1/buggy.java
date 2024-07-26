@@ -1,0 +1,62 @@
+public class test {
+    public int calcHash(int q1)
+    {
+        int hash = q1 ^ _seed;
+        /* 29-Mar-2015, tatu: Earlier used 15 + 9 right shifts, which worked ok
+         *    except for one specific problem case: numbers. So needed to make sure
+         *    that all 4 least-significant bits participate in hash. Couple of ways
+         *    to work it out, but this is the simplest, fast and seems to do ok.
+         */
+        hash += (hash >>> 16); // to xor hi- and low- 16-bits
+        hash ^= (hash >>> 12);
+        return hash;
+    }
+    private int _findOffsetForAdd(int hash)
+    {
+        // first, check the primary:
+        int offset = _calcOffset(hash);
+        final int[] hashArea = _hashArea;
+        if (hashArea[offset+3] == 0) {
+//System.err.printf(" PRImary slot #%d, hash %X\n", (offset>>2), hash & 0x7F);
+            return offset;
+        }
+        // then secondary
+        int offset2 = _secondaryStart + ((offset >> 3) << 2);
+        if (hashArea[offset2+3] == 0) {
+//System.err.printf(" SECondary slot #%d (start x%X), hash %X\n",(offset >> 3), _secondaryStart, (hash & 0x7F));
+            return offset2;
+        }
+        // if not, tertiary?
+
+        offset2 = _tertiaryStart + ((offset >> (_tertiaryShift + 2)) << _tertiaryShift);
+        final int bucketSize = (1 << _tertiaryShift);
+        for (int end = offset2 + bucketSize; offset2 < end; offset2 += 4) {
+            if (hashArea[offset2+3] == 0) {
+//System.err.printf(" TERtiary slot x%X (from x%X, start x%X), hash %X.\n", offset2, ((offset >> (_tertiaryShift + 2)) << _tertiaryShift), _tertiaryStart, (hash & 0x7F));
+                return offset2;
+            }
+        }
+
+        // and if even tertiary full, append at the end of spill area
+        offset = _spilloverEnd;
+        _spilloverEnd += 4;
+
+//System.err.printf(" SPIll-over at x%X; start x%X; end x%X, hash %X\n", offset, _spilloverStart(), _hashArea.length, (hash & 0x7F));
+        
+        // one caveat: in the unlikely event if spill-over filling up,
+        // check if that could be considered a DoS attack; handle appropriately
+        // (NOTE: approximate for now; we could verify details if that becomes necessary)
+        /* 31-Jul-2015, tatu: Note that spillover area does NOT end at end of array,
+         *   since "long names" area follows. Instead, need to calculate from hash size.
+         */
+        if (_spilloverEnd >= hashArea.length) {
+            if (_failOnDoS) {
+                _reportTooManyCollisions();
+            }
+            // and if we didn't fail, we'll simply force rehash for next add
+            // (which, in turn, may double up or nuke contents, depending on size etc)
+            _needRehash = true;
+        }
+        return offset;
+    }
+}

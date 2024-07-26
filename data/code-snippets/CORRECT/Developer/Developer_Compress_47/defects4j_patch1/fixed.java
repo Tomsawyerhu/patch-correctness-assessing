@@ -1,0 +1,64 @@
+public class test {
+    public boolean canReadEntryData(final ArchiveEntry ae) {
+        if (ae instanceof ZipArchiveEntry) {
+            final ZipArchiveEntry ze = (ZipArchiveEntry) ae;
+            return ZipUtil.canHandleEntryData(ze)
+                && supportsDataDescriptorFor(ze)
+                && supportsCompressedSizeFor(ze);
+        }
+        return false;
+    }
+    private boolean supportsCompressedSizeFor(final ZipArchiveEntry entry) {
+        return entry.getCompressedSize() != ArchiveEntry.SIZE_UNKNOWN
+            || entry.getMethod() == ZipEntry.DEFLATED
+            || entry.getMethod() == ZipMethod.ENHANCED_DEFLATED.getCode()
+            || (entry.getGeneralPurposeBit().usesDataDescriptor()
+                && allowStoredEntriesWithDataDescriptor
+                && entry.getMethod() == ZipEntry.STORED);
+    }
+    public int read(final byte[] buffer, final int offset, final int length) throws IOException {
+        if (closed) {
+            throw new IOException("The stream is closed");
+        }
+
+        if (current == null) {
+            return -1;
+        }
+
+        // avoid int overflow, check null buffer
+        if (offset > buffer.length || length < 0 || offset < 0 || buffer.length - offset < length) {
+            throw new ArrayIndexOutOfBoundsException();
+        }
+
+        ZipUtil.checkRequestedFeatures(current.entry);
+        if (!supportsDataDescriptorFor(current.entry)) {
+            throw new UnsupportedZipFeatureException(UnsupportedZipFeatureException.Feature.DATA_DESCRIPTOR,
+                    current.entry);
+        }
+        if (!supportsCompressedSizeFor(current.entry)) {
+            throw new UnsupportedZipFeatureException(UnsupportedZipFeatureException.Feature.UNKNOWN_COMPRESSED_SIZE,
+                    current.entry);
+        }
+
+        int read;
+        if (current.entry.getMethod() == ZipArchiveOutputStream.STORED) {
+            read = readStored(buffer, offset, length);
+        } else if (current.entry.getMethod() == ZipArchiveOutputStream.DEFLATED) {
+            read = readDeflated(buffer, offset, length);
+        } else if (current.entry.getMethod() == ZipMethod.UNSHRINKING.getCode()
+                || current.entry.getMethod() == ZipMethod.IMPLODING.getCode()
+                || current.entry.getMethod() == ZipMethod.ENHANCED_DEFLATED.getCode()
+                || current.entry.getMethod() == ZipMethod.BZIP2.getCode()) {
+            read = current.in.read(buffer, offset, length);
+        } else {
+            throw new UnsupportedZipFeatureException(ZipMethod.getMethodByCode(current.entry.getMethod()),
+                    current.entry);
+        }
+
+        if (read >= 0) {
+            current.crc.update(buffer, offset, read);
+        }
+
+        return read;
+    }
+}

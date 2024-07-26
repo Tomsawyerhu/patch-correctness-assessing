@@ -1,0 +1,102 @@
+public class test {
+    public JavaType constructSpecializedType(JavaType baseType, Class<?> subclass)
+    {
+        // simple optimization to avoid costly introspection if type-erased type does NOT differ
+        final Class<?> rawBase = baseType.getRawClass();
+        if (rawBase == subclass) {
+            return baseType;
+        }
+
+        JavaType newType;
+
+        // also: if we start from untyped, not much to save
+        do { // bogus loop to be able to break
+            if (rawBase == Object.class) {
+                newType = _fromClass(null, subclass, EMPTY_BINDINGS);
+                break;
+            }
+            if (!rawBase.isAssignableFrom(subclass)) {
+                throw new IllegalArgumentException(String.format(
+                        "Class %s not subtype of %s", subclass.getName(), baseType));
+            }
+            // A few special cases where we can simplify handling:
+
+            // (1) Original target type has no generics -- just resolve subtype
+            if (baseType.getBindings().isEmpty()) {
+                newType = _fromClass(null, subclass, EMPTY_BINDINGS);     
+                break;
+            }
+            // (2) A small set of "well-known" List/Map subtypes where can take a short-cut
+            if (baseType.isContainerType()) {
+                if (baseType.isMapLikeType()) {
+                    if ((subclass == HashMap.class)
+                            || (subclass == LinkedHashMap.class)
+                            || (subclass == EnumMap.class)
+                            || (subclass == TreeMap.class)) {
+                        newType = _fromClass(null, subclass,
+                                TypeBindings.create(subclass, baseType.getKeyType(), baseType.getContentType()));
+                        break;
+                    }
+                } else if (baseType.isCollectionLikeType()) {
+                    if ((subclass == ArrayList.class)
+                            || (subclass == LinkedList.class)
+                            || (subclass == HashSet.class)
+                            || (subclass == TreeSet.class)) {
+                        newType = _fromClass(null, subclass,
+                                TypeBindings.create(subclass, baseType.getContentType()));
+                        break;
+                    }
+                    // 29-Oct-2015, tatu: One further shortcut: there are variants of `EnumSet`,
+                    //    but they are impl details and we basically do not care...
+                    if (rawBase == EnumSet.class) {
+                        return baseType;
+                    }
+                }
+            }
+            // (3) Sub-class does not take type parameters -- just resolve subtype
+            int typeParamCount = subclass.getTypeParameters().length;
+            if (typeParamCount == 0) {
+                newType = _fromClass(null, subclass, TypeBindings.emptyBindings());     
+                break;
+            }
+            // (4) If all else fails, do the full traversal using placeholders
+            TypeBindings tb = _bindingsForSubtype(baseType, typeParamCount, subclass);
+            newType = _fromClass(null, subclass, tb);
+
+        } while (false);
+
+        // 25-Sep-2016, tatu: As per [databind#1384] also need to ensure handlers get
+        //   copied as well
+        newType = newType.withHandlersFrom(baseType);
+        return newType;
+    }
+    public JavaType constructParametricType(Class<?> parametrized, Class<?>... parameterClasses) {
+        int len = parameterClasses.length;
+        JavaType[] pt = new JavaType[len];
+        for (int i = 0; i < len; ++i) {
+            pt[i] = _fromClass(null, parameterClasses[i], EMPTY_BINDINGS);
+        }
+        return constructParametricType(parametrized, pt);
+    }
+    protected JavaType parseType(MyTokenizer tokens)
+        throws IllegalArgumentException
+    {
+        if (!tokens.hasMoreTokens()) {
+            throw _problem(tokens, "Unexpected end-of-string");
+        }
+        Class<?> base = findClass(tokens.nextToken(), tokens);
+
+        // either end (ok, non generic type), or generics
+        if (tokens.hasMoreTokens()) {
+            String token = tokens.nextToken();
+            if ("<".equals(token)) {
+                List<JavaType> parameterTypes = parseTypes(tokens);
+                TypeBindings b = TypeBindings.create(base, parameterTypes);
+                return _factory._fromClass(null, base, b);
+            }
+            // can be comma that separates types, or closing '>'
+            tokens.pushBack(token);
+        }
+        return _factory._fromClass(null, base, TypeBindings.emptyBindings());
+    }
+}

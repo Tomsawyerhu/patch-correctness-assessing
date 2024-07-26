@@ -1,0 +1,14 @@
+public class test {
+    public void writeNumber(BigDecimal value) throws IOException
+    {
+        // Don't really know max length for big decimal, no point checking
+        _verifyValueWrite(WRITE_NUMBER);
+        if (value == null) {
+            _writeNull();
+        } else  if (_cfgNumbersAsStrings) {
+            _writeQuotedRaw(_asString(value));
+        } else {
+            writeRaw(_asString(value));
+        }
+    }
+}
